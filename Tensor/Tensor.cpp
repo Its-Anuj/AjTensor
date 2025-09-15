@@ -5,7 +5,7 @@
 
 namespace Tensor
 {
-    
+    Tensor Tensor::Flatten()
+    {
+    }
 } // namespace Tensor
-
-
