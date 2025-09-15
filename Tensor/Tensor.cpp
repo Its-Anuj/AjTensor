@@ -3,7 +3,9 @@
 #include <memory>
 #include "Tensor.h"
 
-int main(int, char **)
+namespace Tensor
 {
-    std::cout << "Hello, from Example!\n";
-}
+    
+} // namespace Tensor
+
+
