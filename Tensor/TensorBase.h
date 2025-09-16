@@ -13,6 +13,15 @@
         throw std::runtime_error("Error"); \
     }
 
+#define __PRINT__TENSOR(x) \
+    {                      \
+        std::cout << x;    \
+    }
+#define __PRINTLN__TENSOR(x)    \
+    {                           \
+        std::cout << x << "\n"; \
+    }
+
 namespace Tensor
 {
     template <typename _T>
@@ -81,6 +90,7 @@ namespace Tensor
                 return;
             // WE set all variables of count and offset to 0 effectively reseting
             free(_Tensor);
+            __PRINTLN__TENSOR("Tensor Storage Freed: " << _Count * sizeof(_T));
             _Tensor = TENSOR_NULLPTR;
             _Count = 0;
             _NextOffset = 0;
@@ -101,6 +111,9 @@ namespace Tensor
 
         int NDims() const { return _Dims.size(); }
         int Count() const { return _Count; }
+
+        const std::vector<int> &Dims() const { return _Dims; }
+        const std::vector<int> &Stride() const { return _Stride; }
 
         _T *Data() { return _StrPtr->Data() + _Offset; }
         const _T *Data() const { return _StrPtr->Data() + _Offset; }
@@ -127,7 +140,7 @@ namespace Tensor
                 _Count *= dim;
         }
 
-        void Init(TensorStorage<_T> *StrPtr, const std::initializer_list<int> &IDims)
+        void Init(TensorStorage<_T> *StrPtr, const std::initializer_list<int> &IDims, int Offset = -1)
         {
             _Dims.reserve(IDims.size());
             for (auto &dim : IDims)
@@ -136,8 +149,27 @@ namespace Tensor
             _CalculateCount();
             _CalculateStride();
 
+            _Offset = Offset;
             _StrPtr = StrPtr;
-            _Offset = StrPtr->GetOffset(_Count);
+
+            if (Offset == -1)
+                _Offset = StrPtr->GetOffset(_Count);
+        }
+
+        void Init(TensorStorage<_T> *StrPtr, const std::vector<int> &IDims, int Offset = -1)
+        {
+            _Dims.reserve(IDims.size());
+            for (auto &dim : IDims)
+                _Dims.push_back(dim);
+
+            _CalculateCount();
+            _CalculateStride();
+
+            _Offset = Offset;
+            _StrPtr = StrPtr;
+
+            if (Offset == -1)
+                _Offset = StrPtr->GetOffset(_Count);
         }
 
         _T &Get(const std::vector<int> &dims)
@@ -168,11 +200,68 @@ namespace Tensor
         Iterator begin() { return Data(); }
         Iterator end() { return Data() + Count(); }
 
+        int Offset() const { return _Offset; }
+
+        std::shared_ptr<TensorMetaData<_T>> Slice(int i)
+        {
+            std::shared_ptr<TensorMetaData<_T>> NewData = std::make_shared<TensorMetaData<float>>();
+
+            if (this->NDims() == 1)
+            {
+                int NewOffset = 0;
+                // Using stride to calculate new offset
+
+                NewData->Init(_StrPtr, {1}, _Offset + i * this->Stride()[0]);
+            }
+
+            if (NDims() >= 2)
+            {
+                int NewOffset = 0;
+                std::vector<int> NewDims;
+                NewDims.reserve((this->NDims() - 1));
+
+                for (int i = 1; i < this->NDims(); i++)
+                    NewDims.push_back(this->Dims()[i]);
+
+                // Using stride to calculate new offset
+                NewOffset = i * this->Stride()[0];
+
+                NewData->Init(_StrPtr, NewDims, NewOffset);
+            }
+            return NewData;
+        }
+
+        void Fill(const _T &V)
+        {
+            for (int i = 0; i < Count(); i++)
+                Data()[i] = V;
+        }
+
+        _T &GetFlat(int i) { return Data()[i]; }
+        const _T &GetFlat(int i) const { return Data()[i]; }
+
     private:
         TensorStorage<_T> *_StrPtr;
         std::vector<int> _Dims, _Stride;
         // Offset in our StrPtr
         int _Offset = 0;
         int _Count = 0;
+    };
+
+    // Will be implemented in next commit
+    // TODO: Use this Singleton to controll all of our meta data and storage functions making it cleaner
+    template <typename _T>
+    class TensorBase
+    {
+    public:
+        static TensorBase<_T> &Get()
+        {
+            static TensorBase &Instance;
+            return Instance;
+        }
+
+    private:
+        TensorBase() {}
+        ~TensorBase() {}
     };
 } // namespace Tensor
